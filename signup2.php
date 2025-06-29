@@ -17,7 +17,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $name = trim($_POST['name'] ?? '');
     $surname = trim($_POST['surname'] ?? '');
     $full_name = trim($name . ' ' . $surname);
-    $email = $_POST['email'] ?? '';
+    $email = strtolower(trim($_POST['email'] ?? '')); // Normalize email to lowercase
     $password_plain = $_POST['password'] ?? '';
     $nationality = $_POST['nationality'] ?? '';
     $countryCode = $_POST['countryCode'] ?? '';
@@ -25,22 +25,45 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $phone = $countryCode . $phoneNumber;
     $agreed_terms = isset($_POST['agreed_terms']) ? 1 : 0;
 
-    // Hash the password securely
-    $password_hashed = password_hash($password_plain, PASSWORD_DEFAULT);
-
-    // Insert using prepared statement
-    $sql = "INSERT INTO users (full_name, email, password, nationality, phone, agreed_terms)
-            VALUES (?, ?, ?, ?, ?, ?)";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("sssssi", $full_name, $email, $password_hashed, $nationality, $phone, $agreed_terms);
-
-    if ($stmt->execute()) {
-        echo "<p style='color:green;'>✅ Signup successful!</p>";
+    // Validate required fields
+    if (empty($name) || empty($surname) || empty($email) || empty($password_plain)) {
+        $signup_error = "❌ All required fields must be filled";
     } else {
-        echo "<p style='color:red;'>❌ Error: " . $stmt->error . "</p>";
-    }
+        // Check if email already exists
+        $check_sql = "SELECT id FROM users WHERE LOWER(email) = ?";
+        $check_stmt = $conn->prepare($check_sql);
+        $check_stmt->bind_param("s", $email);
+        $check_stmt->execute();
+        $check_result = $check_stmt->get_result();
+        
+        if ($check_result->num_rows > 0) {
+            $signup_error = "❌ An account with this email already exists";
+        } else {
+            // Hash the password securely
+            $password_hashed = password_hash($password_plain, PASSWORD_DEFAULT);
+            
+            // Add debugging (remove after fixing)
+            error_log("Creating account for email: " . $email);
+            error_log("Password hash created: " . substr($password_hashed, 0, 10) . "...");
 
-    $stmt->close();
+            // Insert using prepared statement
+            $sql = "INSERT INTO users (full_name, email, password, nationality, phone, agreed_terms)
+                    VALUES (?, ?, ?, ?, ?, ?)";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("sssssi", $full_name, $email, $password_hashed, $nationality, $phone, $agreed_terms);
+
+            if ($stmt->execute()) {
+                $signup_success = "✅ Signup successful! You can now login with your credentials.";
+                error_log("Account created successfully for: " . $email);
+            } else {
+                $signup_error = "❌ Error: " . $stmt->error;
+                error_log("Database error: " . $stmt->error);
+            }
+
+            $stmt->close();
+        }
+        $check_stmt->close();
+    }
     $conn->close();
 }
 ?>
@@ -55,26 +78,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <script src="form.js" defer></script>
 </head>
 <body>
-<?php
-$showResult = false;
-$resultMsg = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $name = trim($_POST['name'] ?? '');
-    $surname = trim($_POST['surname'] ?? '');
-    $full_name = $name . ' ' . $surname;
-    $nationality = $_POST['nationality'] ?? '';
-    $countryCode = $_POST['countryCode'] ?? '';
-    $phone = $_POST['phone'] ?? '';
-    $email = $_POST['email'] ?? '';
-    $password = $_POST['password'] ?? '';
-    $fullPhone = $countryCode . $phone;
-    $showResult = true;
-    $resultMsg = "<strong>Submitted Data:</strong><br>" .
-        "Name: $name $surname<br>Nationality: $nationality<br>Email: $email<br>Phone: $fullPhone<br>Password: $password (hashed in real DB)";
-}
-?>
     <div class="container" x-data="signupForm()" x-init="init()">
         <h2>Create Account</h2>
+        
+        <?php if (isset($signup_success)): ?>
+            <div style="margin-bottom: 20px; padding: 12px; background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 5px; color: #155724; text-align: center;">
+                <?php echo htmlspecialchars($signup_success); ?>
+                <br><br>
+                <a href="login.php" style="color: #155724; font-weight: bold; text-decoration: underline;">Go to Login Page</a>
+            </div>
+        <?php endif; ?>
+        
+        <?php if (isset($signup_error)): ?>
+            <div style="margin-bottom: 20px; padding: 12px; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px; color: #721c24; text-align: center;">
+                <?php echo htmlspecialchars($signup_error); ?>
+            </div>
+        <?php endif; ?>
+        
         <form method="POST">
             <div class="form-group">
                 <label for="name">First Name *</label>
@@ -158,12 +178,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input type="password" id="password" name="password" x-model="form.password" required>
             </div>
             <button type="submit" class="submit-btn">Create Account</button>
-    </form>
-        <?php if ($showResult): ?>
-            <div class="result-box">
-                <?php echo $resultMsg; ?>
-            </div>
-        <?php endif; ?>
+            </form>
     </div>
     <script>
     function signupForm() {
