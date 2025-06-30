@@ -67,14 +67,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $phone = $_POST['phone'] ?? '';
     $email = $_POST['email'] ?? '';
     $password = $_POST['password'] ?? '';
+    $agreed_terms = isset($_POST['agreed_terms']) ? 'Yes' : 'No';
     $fullPhone = $countryCode . $phone;
     $showResult = true;
     $resultMsg = "<strong>Submitted Data:</strong><br>" .
-        "Name: $name $surname<br>Nationality: $nationality<br>Email: $email<br>Phone: $fullPhone<br>Password: $password (hashed in real DB)";
+        "Name: $name $surname<br>Nationality: $nationality<br>Email: $email<br>Phone: $fullPhone<br>Password: $password (hashed in real DB)<br>Agreed to Terms: $agreed_terms";
 }
 ?>
     <div class="container" x-data="signupForm()" x-init="init()">
         <h2>Create Account</h2>
+        
+        <div class="terms-section" style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #e9ecef;">
+            <h3 style="margin-top: 0; color: #495057;">Terms and Conditions</h3>
+            <p style="margin-bottom: 15px; line-height: 1.6; color: #6c757d;">
+                By creating an account, you agree to our Terms of Service and Privacy Policy. 
+                You acknowledge that you have read, understood, and agree to be bound by these terms. 
+                You also consent to the collection and processing of your personal data as described 
+                in our Privacy Policy.
+            </p>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" name="agreed_terms" x-model="form.agreed_terms" required style="margin-right: 10px; transform: scale(1.2);">
+                    <span style="color: #495057; font-weight: 500;">I agree to the Terms and Conditions *</span>
+                </label>
+            </div>
+        </div>
+        
         <form method="POST">
             <div class="form-group">
                 <label for="name">First Name *</label>
@@ -175,7 +193,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 countryCode: '',
                 phone: '',
                 email: '',
-                password: ''
+                password: '',
+                agreed_terms: false
             },
             countryCodes: {
                 "United Kingdom": "+44",
