@@ -13,6 +13,44 @@ if (isset($_GET['logout'])) {
     header("Location: login.php");
     exit();
 }
+
+// Fetch user data from database
+$host = "localhost";
+$username = "root";
+$password = ""; // Set this if your MySQL has a password
+$dbname = "enrollment_db2";
+
+$conn = new mysqli($host, $username, $password, $dbname);
+
+if ($conn->connect_error) {
+    die("❌ Connection failed: " . $conn->connect_error);
+}
+
+// Get user data using the session user ID
+$user_id = $_SESSION['user_id'];
+$sql = "SELECT id, full_name, email, nationality, phone, agreed_terms, created_at FROM users WHERE id = ?";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$result = $stmt->get_result();
+
+if ($result->num_rows > 0) {
+    $user_data = $result->fetch_assoc();
+} else {
+    // Fallback to session data if database query fails
+    $user_data = [
+        'id' => $_SESSION['user_id'],
+        'full_name' => $_SESSION['user_name'],
+        'email' => $_SESSION['user_email'],
+        'nationality' => 'Not available',
+        'phone' => 'Not available',
+        'agreed_terms' => 'Not available',
+        'created_at' => 'Not available'
+    ];
+}
+
+$stmt->close();
+$conn->close();
 ?>
 
 <!DOCTYPE html>
@@ -91,15 +129,49 @@ if (isset($_GET['logout'])) {
         <div class="profile-info">
             <div class="info-row">
                 <span class="info-label">User ID:</span>
-                <span class="info-value"><?php echo htmlspecialchars($_SESSION['user_id']); ?></span>
+                <span class="info-value"><?php echo htmlspecialchars($user_data['id']); ?></span>
             </div>
             <div class="info-row">
                 <span class="info-label">Full Name:</span>
-                <span class="info-value"><?php echo htmlspecialchars($_SESSION['user_name']); ?></span>
+                <span class="info-value"><?php echo htmlspecialchars($user_data['full_name']); ?></span>
             </div>
             <div class="info-row">
                 <span class="info-label">Email Address:</span>
-                <span class="info-value"><?php echo htmlspecialchars($_SESSION['user_email']); ?></span>
+                <span class="info-value"><?php echo htmlspecialchars($user_data['email']); ?></span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Nationality:</span>
+                <span class="info-value"><?php echo htmlspecialchars($user_data['nationality']); ?></span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Phone:</span>
+                <span class="info-value"><?php echo htmlspecialchars($user_data['phone']); ?></span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Agreed Terms:</span>
+                <span class="info-value">
+                    <?php 
+                    if ($user_data['agreed_terms'] == 1) {
+                        echo "✅ Yes - Agreed to Terms and Conditions";
+                    } elseif ($user_data['agreed_terms'] == 0) {
+                        echo "❌ No - Did not agree to Terms and Conditions";
+                    } else {
+                        echo htmlspecialchars($user_data['agreed_terms']);
+                    }
+                    ?>
+                </span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Account Created:</span>
+                <span class="info-value">
+                    <?php 
+                    if ($user_data['created_at'] != 'Not available') {
+                        echo date('F j, Y \a\t g:i A', strtotime($user_data['created_at']));
+                    } else {
+                        echo htmlspecialchars($user_data['created_at']);
+                    }
+                    ?>
+                </span>
             </div>
             <div class="info-row">
                 <span class="info-label">Login Status:</span>

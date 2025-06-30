@@ -15,39 +15,56 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         die("❌ Connection failed: " . $conn->connect_error);
     }
 
-    // Get form data safely
-    $email = trim($_POST['email'] ?? '');
-    $password_plain = trim($_POST['password'] ?? '');
+    // Get form data safely and normalize email
+    $email = strtolower(trim($_POST['email'] ?? ''));
+    $password_plain = $_POST['password'] ?? '';
 
+    // Add debugging (remove these lines after fixing)
+    error_log("Login attempt for email: " . $email);
+    
     // Check if user exists and password is correct
-    $sql = "SELECT id, full_name, email, password FROM users WHERE email = ?";
+    $sql = "SELECT id, full_name, email, password FROM users WHERE LOWER(email) = ?";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("s", $email);
-    $stmt->execute();
-    $result = $stmt->get_result();
+    
+    if (!$stmt) {
+        error_log("Prepare failed: " . $conn->error);
+        $error_message = "❌ Database error occurred";
+    } else {
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $result = $stmt->get_result();
 
-    if ($result->num_rows > 0) {
-        $user = $result->fetch_assoc();
-        
-        // Verify password
-        if (password_verify($password_plain, $user['password'])) {
-            // Login successful - store user data in session
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['user_name'] = $user['full_name'];
-            $_SESSION['user_email'] = $user['email'];
-            $_SESSION['logged_in'] = true;
+        if ($result->num_rows > 0) {
+            $user = $result->fetch_assoc();
             
-            // Redirect to profile page
-            header("Location: profile.php");
-            exit();
+            // Add debugging (remove after fixing)
+            error_log("User found in database");
+            error_log("Stored password hash: " . substr($user['password'], 0, 10) . "...");
+            
+            // Verify password
+            if (password_verify($password_plain, $user['password'])) {
+                // Login successful - store user data in session
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['user_name'] = $user['full_name'];
+                $_SESSION['user_email'] = $user['email'];
+                $_SESSION['logged_in'] = true;
+                
+                error_log("Login successful for user: " . $user['email']);
+                
+                // Redirect to welcome page
+                header("Location: welcomePage.php");
+                exit();
+            } else {
+                error_log("Password verification failed");
+                $error_message = "❌ Invalid email or password";
+            }
         } else {
+            error_log("No user found with email: " . $email);
             $error_message = "❌ Invalid email or password";
         }
-    } else {
-        $error_message = "❌ Invalid email or password";
-    }
 
-    $stmt->close();
+        $stmt->close();
+    }
     $conn->close();
 }
 ?>
